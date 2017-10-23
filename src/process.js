@@ -30,7 +30,7 @@ ProcessInstance.prototype.tryToAcquireLock =  function() {
 	});
 	redlockInstance.lock(config.lockResource, config.lockTime).then((lock) => {
 		logForProcess('Lock acquired!');
-		extendLockTillApplicationStop(lock);
+		self.extendLockTillApplicationStop(lock);
 		self.generateMessages();
 		if (config.generatorLifeTime > 0) {
 			setTimeout(() => {
@@ -39,18 +39,22 @@ ProcessInstance.prototype.tryToAcquireLock =  function() {
 			}, config.generatorLifeTime);
 		}
 	}, (lockError) => {
-		//logForProcess('Try to acquire lock once again');
 		self.tryToAcquireLock();
 	});
 };
 
 ProcessInstance.prototype.listenMessages = function() {
 	var self = this;
+
 	self.isWorker = true;
+	self.isGenerator = false;
+	if (self.genMessagesInterval !== null) {
+		clearInterval(self.genMessagesInterval);
+	}
+
 	self.messagingRedisConnection.subscribe(config.messagesChannel);
 	self.messagingRedisConnection.on('message', (channel, message) => {
 		if (channel === config.messagesChannel) {
-			//logForProcess('Received message', message);
 			var data = JSON.parse(message);
 			if (data && data.uuid) {
 				self.mainRedisConection.set([config.taskExecutionLockKeyPrefix + ':' + data.uuid, 1, 'NX', 'EX', config.taskExecutionLockSeconds], (err, reply) => {
@@ -108,6 +112,7 @@ ProcessInstance.prototype.generateMessages = function() {
 			'Camera'
 		];
 
+		// generate error in 5% of all messages
 		if (Math.random() > 0.95) {
 			var item = partsCanBeBroken[Math.floor(Math.random() * partsCanBeBroken.length)];
 			message = item + ' is broken!';
@@ -125,11 +130,16 @@ ProcessInstance.prototype.generateMessages = function() {
 	}, config.messagesDelay);
 };
 
- function extendLockTillApplicationStop(lock) {
+ProcessInstance.prototype.extendLockTillApplicationStop = function(lock) {
+	var self = this;
 	lock.extend(config.lockTime).then((lock) => {
 		setTimeout(() => {
-			extendLockTillApplicationStop(lock);
+			self.extendLockTillApplicationStop(lock);
 		}, (config.lockTime - 50));
+	}, (err) => {
+		logForProcess('Failed to extend lock');
+		logForProcess(err);
+		self.listenMessages();
 	});
 }
 
