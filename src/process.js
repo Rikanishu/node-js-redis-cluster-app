@@ -1,9 +1,9 @@
-var config = require('./config');
-var redis = require('redis');
-var utils = require('./utils');
-var Redlock = require('redlock');
-var uuid = require('uuid/v1');
-var cluster = require('cluster');
+const redis = require('redis');
+const Redlock = require('redlock');
+const uuid = require('uuid/v1');
+const cluster = require('cluster');
+const config = require('./config');
+const utils = require('./utils');
 
 var ProcessInstance = function() {
 	this.mainRedisConection = utils.connectToRedis();
@@ -32,10 +32,12 @@ ProcessInstance.prototype.tryToAcquireLock =  function() {
 		logForProcess('Lock acquired!');
 		extendLockTillApplicationStop(lock);
 		self.generateMessages();
-		setTimeout(() => {
-			logForProcess('Time to die...');
-			process.exit(0);
-		}, config.generatorLifeTime);
+		if (config.generatorLifeTime > 0) {
+			setTimeout(() => {
+				logForProcess('Time to die...');
+				process.exit(0);
+			}, config.generatorLifeTime);
+		}
 	}, (lockError) => {
 		//logForProcess('Try to acquire lock once again');
 		self.tryToAcquireLock();
