@@ -14,8 +14,8 @@ var ProcessInstance = function() {
 };
 
 ProcessInstance.prototype.run = function() {
-	this.tryToAcquireLock();
 	this.listenMessages();
+	this.tryToAcquireLock();
 };
 
 ProcessInstance.prototype.tryToAcquireLock =  function() {
@@ -50,6 +50,7 @@ ProcessInstance.prototype.listenMessages = function() {
 	self.isGenerator = false;
 	if (self.genMessagesInterval !== null) {
 		clearInterval(self.genMessagesInterval);
+		self.genMessagesInterval = null;
 	}
 
 	self.messagingRedisConnection.subscribe(config.messagesChannel);
